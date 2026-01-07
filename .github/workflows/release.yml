@@ -1,0 +1,132 @@
+name: Release
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  REGISTRY: registry.finkhoz.com
+  REGISTRY_USERNAME: ${{ secrets.FINKHOZ_REGISTRY_USERNAME }}
+  REGISTRY_PASSWORD: ${{ secrets.FINKHOZ_REGISTRY_PASSWORD }}
+  IMAGE_NAME: ${{ github.repository }}
+  GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+jobs:
+  version-release:
+    runs-on: 
+      group: finkhoz
+    permissions:
+      issues: write
+      contents: write
+    outputs:
+      version: ${{ steps.semantic-release.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0      # fetch all history & tags
+        
+      - name: Setup Node.js (required for semantic-release)
+        uses: actions/setup-node@v6
+        with:
+          node-version: 18
+        
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-semantic-release-${{ hashFiles('.github/workflows/release.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-semantic-release-
+            ${{ runner.os }}-npm-
+        
+      - name: Install dependencies
+        run: npm install semantic-release @semantic-release/git @semantic-release/github @semantic-release/exec
+        
+      - name: Generate Semantic Release
+        id: semantic-release
+        continue-on-error: false
+        env:
+          GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+        run: |
+          npx semantic-release
+          VERSION=$(cat VERSION)
+          echo "Resolved version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+  
+  build-and-push-image:
+    needs: version-release
+    name: Build and push image ${{ needs.version-release.outputs.version }}
+    runs-on: 
+      group: finkhoz
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0      # fetch all history & tags
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USERNAME }}
+          password: ${{ env.REGISTRY_PASSWORD }}
+
+      - name: Build and push Docker image with version tag
+        if: ${{ needs.version-release.outputs.version != '' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version-release.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+  
+  deploy-staging:
+    needs: [version-release, build-and-push-image]
+    name: Deploy to Staging
+    runs-on:
+      group: finkhoz
+    environment:
+      name: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0      # fetch all history & tags
+        
+      - name: Deploying ${{ needs.version-release.outputs.version }} to Staging
+        if: ${{ needs.version-release.outputs.version != '' }}
+        uses: appleboy/ssh-action@v1
+        env:
+          PORT: "${{ vars.PORT }}"
+          DATABASE_URL: "${{ vars.DATABASE_URL }}"
+          JWT_SECRET: "${{ vars.JWT_SECRET }}"
+          WORKING_DIR: "/home/ubuntu/finkhoz/platform"
+          REGISTRY: "${{ env.REGISTRY }}"
+          REGISTRY_USERNAME: "${{ env.REGISTRY_USERNAME }}"
+          REGISTRY_PASSWORD: "${{ env.REGISTRY_PASSWORD }}"
+          IMAGE_NAME: "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          IMAGE_TAG: "${{ needs.version-release.outputs.version }}"
+        with:
+          host: ${{ secrets.SSH_HOSTNAME }}
+          username: "${{ secrets.SSH_USERNAME }}"
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: PORT,DATABASE_URL,JWT_SECRET,WORKING_DIR,REGISTRY,REGISTRY_USERNAME,REGISTRY_PASSWORD,IMAGE_NAME,IMAGE_TAG
+          script: |
+            cd $WORKING_DIR;
+            mkdir -p services/staging/configs;
+            echo "PORT=$PORT" > services/staging/configs/users.env;
+            echo "DATABASE_URL=$DATABASE_URL" >> services/staging/configs/users.env;
+            echo "JWT_SECRET=$JWT_SECRET" >> services/staging/configs/users.env;
+            sed -i "s|image: ${IMAGE_NAME}:.*|image: ${IMAGE_NAME}:${IMAGE_TAG}|" services/staging/docker-compose.yaml;
+            docker login $REGISTRY -u $REGISTRY_USERNAME -p $REGISTRY_PASSWORD;
+            docker compose --env-file $WORKING_DIR/.env -f services/staging/docker-compose.yaml pull users;
+            docker compose --env-file $WORKING_DIR/.env -f services/staging/docker-compose.yaml up -d users;
+            docker compose --env-file $WORKING_DIR/.env -f services/staging/docker-compose.yaml ps;
+            docker image prune -f;

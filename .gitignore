@@ -1,0 +1,43 @@
+# Binaries
+main
+translation-service
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+*.out
+
+# Go workspace file
+go.work
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test scripts and results (optional - uncomment if you want to exclude)
+# test_*.sh
+# TEST*.md
+# TESTING.md
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/

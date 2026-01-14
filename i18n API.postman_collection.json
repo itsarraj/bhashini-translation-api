@@ -1,0 +1,189 @@
+{
+	"info": {
+		"_postman_id": "8cc3cc75-c7a1-49fa-8356-daa5f791e5d1",
+		"name": "i18n API",
+		"description": "Translation Service API for i18n and localization. Provides endpoints for translating text between supported languages and managing translation cache.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "26179836",
+		"_collection_link": "https://grey-station-761379.postman.co/workspace/Team-Workspace~1078827e-19f8-481e-846d-ea2d9c59ef67/collection/26179836-8cc3cc75-c7a1-49fa-8356-daa5f791e5d1?action=share&source=collection_link&creator=26179836"
+	},
+	"item": [
+		{
+			"name": "v1",
+			"item": [
+				{
+					"name": "translate",
+					"item": [
+						{
+							"name": "translateText",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"source_text\": \"Hello, how are you?\",\n    \"source_lang\": \"en\",\n    \"target_lang\": \"hi\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/v1/translate",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"v1",
+										"translate"
+									]
+								},
+								"description": "Translate text from source language to target language.\n\n**Supported languages:** en, hi, mr, ta, te, gu, pa, or, ml\n\n**Request Body:**\n- `source_text` (required): Text to translate\n- `source_lang` (required): Source language code (ISO-639)\n- `target_lang` (required): Target language code (ISO-639)\n\n**Response:**\n- `status`: success/error\n- `data`: Translation response with source and translated text"
+							},
+							"response": []
+						},
+						{
+							"name": "translateBatch",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"items\": [\n        {\n            \"source_text\": \"Hello\",\n            \"source_lang\": \"en\",\n            \"target_lang\": \"hi\"\n        },\n        {\n            \"source_text\": \"World\",\n            \"source_lang\": \"en\",\n            \"target_lang\": \"hi\"\n        }\n    ]\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BASE_URL}}/v1/translate/batch",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"v1",
+										"translate",
+										"batch"
+									]
+								},
+								"description": "Translate multiple texts at once with individual language pairs.\n\n**Supported languages:** en, hi, mr, ta, te, gu, pa, or, ml\n\n**Request Body:**\n- `items` (required): Array of translation items\n  - `source_text` (required): Text to translate\n  - `source_lang` (required): Source language code (ISO-639)\n  - `target_lang` (required): Target language code (ISO-639)\n\n**Response:**\n- `status`: success/error\n- `data`: Batch translation response with arrays:\n  - `source_texts`: Array of source texts\n  - `source_langs`: Array of source language codes\n  - `target_langs`: Array of target language codes\n  - `translated_texts`: Array of translated texts"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "languages",
+					"item": [
+						{
+							"name": "getSupportedLanguages",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BASE_URL}}/v1/languages",
+									"host": [
+										"{{BASE_URL}}"
+									],
+									"path": [
+										"v1",
+										"languages"
+									]
+								},
+								"description": "Get list of supported language codes (ISO-639). Used by frontend for language dropdown and i18n localization.\n\n**Response:**\n- `status`: success\n- `data`: Array of supported language codes: [\"en\", \"hi\", \"mr\", \"ta\", \"te\", \"gu\", \"pa\", \"or\", \"ml\"]"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "manage",
+					"item": [
+						{
+							"name": "cache",
+							"item": [
+								{
+									"name": "cleanCache",
+									"request": {
+										"method": "POST",
+										"header": [],
+										"url": {
+											"raw": "{{BASE_URL}}/v1/manage/cache/clean",
+											"host": [
+												"{{BASE_URL}}"
+											],
+											"path": [
+												"v1",
+												"manage",
+												"cache",
+												"clean"
+											]
+										},
+										"description": "Clean expired translation cache entries. Removes all cached translations that have exceeded their TTL (Time To Live).\n\n**Response:**\n- `status`: success/error\n- `message`: Confirmation message"
+									},
+									"response": []
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{BASE_URL}}/health",
+					"host": [
+						"{{BASE_URL}}"
+					],
+					"path": [
+						"health"
+					]
+				},
+				"description": "Check service health and status"
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "BASE_URL",
+			"value": "http://localhost:3001",
+			"type": "string"
+		}
+	]
+}
